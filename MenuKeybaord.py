@@ -34,7 +34,7 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
             await context.bot.send_photo(
                 chat_id=update.message.chat_id,
                 photo="images/接机.jpg",  # Replace with your image path
-                caption="🌟 欢迎加入【后勤接机】群 🌟"  # Caption for the photo
+                caption="🌟 欢迎加入【后勤接机】群 🌟\n\n"  # Caption for the photo
                             "📋 《须填的信息》"
 
                             "✈️ 落地签办理信息："
@@ -49,7 +49,7 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
                 reply_markup=inline_markup
             )
 
-        elif user_input == "🔖 办证":
+        elif user_input == "🔖 证照办理":
             inline_keyboard = [
                 [InlineKeyboardButton("客服", url="https://example.com/exchange")],
             ]
@@ -58,12 +58,39 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
             # Send photo, caption, and buttons together
             await context.bot.send_photo(
                 chat_id=update.message.chat_id,
-                photo=open(r"C:\Users\ROG\Downloads\笔记本.jpg", "rb"),  # Replace with your image path
+               photo="images/passport.jpg",  # Replace with your image path
                 caption="换汇服务: 查看最新汇率或者联系客服。",  # Caption for the photo
                 reply_markup=inline_markup
             )
 
-        elif user_input == "🏤 房产":
+        elif user_input == "🏤 房产凭租":
+            inline_keyboard = [
+                [InlineKeyboardButton("客服", url="https://example.com/exchange")],
+            ]
+            inline_markup = InlineKeyboardMarkup(inline_keyboard)
+
+            # Send photo, caption, and buttons together
+            await context.bot.send_photo(
+                chat_id=update.message.chat_id,
+               photo="images/resized-image.jpg",  # Replace with your image path
+                caption="换汇服务: 查看最新汇率或者联系客服。",  # Caption for the photo
+                reply_markup=inline_markup
+            )
+
+        elif user_input == "🏩 酒店预订":
+            inline_keyboard = [
+                [InlineKeyboardButton("客服", url="https://example.com/exchange")],
+            ]
+            inline_markup = InlineKeyboardMarkup(inline_keyboard)
+
+            # Send photo, caption, and buttons together
+            await context.bot.send_photo(
+                chat_id=update.message.chat_id,
+               photo="images/sofietel.jpg",  # Replace with your image path
+                caption="换汇服务: 查看最新汇率或者联系客服。",  # Caption for the photo
+                reply_markup=inline_markup
+            )
+        elif user_input == "🍽️ 食堂信息":
             inline_keyboard = [
                 [InlineKeyboardButton("更多详情", url="https://example.com/办证")],
             ]
@@ -72,12 +99,12 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
             # Send photo, caption, and buttons together
             await context.bot.send_photo(
                 chat_id=update.message.chat_id,
-                photo=open(r"C:\Users\ROG\Downloads\笔记本.jpg", "rb"),  # Replace with your image path
+                photo="images/sofietel.jpg",  # Replace with your image path
                 caption="办证服务详情如下:",  # Caption for the photo
                 reply_markup=inline_markup
             )
 
-        elif user_input == "转账 (Transfer)":
+        elif user_input == "📦 生活物资":
             inline_keyboard = [
                 [InlineKeyboardButton("立即转账", url="https://example.com/transfer")],
             ]
@@ -86,39 +113,26 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
             # Send photo, caption, and buttons together
             await context.bot.send_photo(
                 chat_id=update.message.chat_id,
-                photo=open(r"C:\Users\ROG\Downloads\笔记本.jpg", "rb"),  # Replace with your image path
+                photo="images/接机.jpg",  # Replace with your image path
                 caption="转账服务即将上线，敬请期待！",  # Caption for the photo
                 reply_markup=inline_markup
             )
 
-        elif user_input == "房产":
+        elif user_input == "🔔 后勤生活信息频道":
             inline_keyboard = [
-                [InlineKeyboardButton("房产详情", url="https://example.com/real-estate")],
+                [InlineKeyboardButton("进群", url="https://t.me/+QQ56RVTKshQxMDU1")],
             ]
             inline_markup = InlineKeyboardMarkup(inline_keyboard)
 
             # Send photo, caption, and buttons together
             await context.bot.send_photo(
                 chat_id=update.message.chat_id,
-                photo=open(r"C:\Users\ROG\Downloads\笔记本.jpg", "rb"),  # Replace with your image path
+                photo="images/Screenshot 2025-02-03 173313.png",  # Replace with your image path
                 caption="房产服务详情如下:",  # Caption for the photo
                 reply_markup=inline_markup
             )
 
-        elif user_input == "收款 (Receive Money)":
-            inline_keyboard = [
-                [InlineKeyboardButton("查看收款详情", url="https://example.com/receive-money")],
-            ]
-            inline_markup = InlineKeyboardMarkup(inline_keyboard)
-
-            # Send photo, caption, and buttons together
-            await context.bot.send_photo(
-                chat_id=update.message.chat_id,
-                photo=open(r"C:\Users\ROG\Downloads\笔记本.jpg", "rb"),  # Replace with your image path
-                caption="收款功能: 请查看以下详情。",  # Caption for the photo
-                reply_markup=inline_markup
-            )
-
+        
         else:
             await update.message.reply_text("未识别的选项，请选择菜单中的一个选项。")
 

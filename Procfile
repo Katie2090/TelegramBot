@@ -1,1 +1,1 @@
-worker: python MenuKeybaord.py
+worker: python Bot.py

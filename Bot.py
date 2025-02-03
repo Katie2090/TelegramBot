@@ -33,7 +33,7 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
             # Send photo, caption, and buttons together
             await context.bot.send_photo(
                 chat_id=update.message.chat_id,
-                photo=open(r"C:\Users\ROG\Desktop\接机.jpg", "rb"),  # Replace with your image path
+                photo="https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/YOUR_REPO/main/images/接机.jfif",  # Replace with your image path
                 caption="🌟 欢迎加入【后勤接机】群 🌟"  # Caption for the photo
                             "📋 《须填的信息》"
 

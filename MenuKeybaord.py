@@ -184,7 +184,7 @@ async def update_message(context: CallbackContext, chat_id: int, message_id: int
     except Exception as e:
         logger.error(f"❌ Failed to update message {message_id} for chat {chat_id}: {e}")
 
-# /broadcast command handler (for sending message, photo, and inline buttons)
+# /broadcast command handler (for sending message, local photo, and inline buttons)
 async def broadcast(update: Update, context: CallbackContext) -> None:
     """Send a broadcast message to all stored users."""
     user_chat_ids = load_user_chat_ids()
@@ -194,18 +194,19 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("⚠️ 请输入要发送的公告内容，如：\n\n`/broadcast 这里是公告内容`")
         return
 
-    # Extract message, photo URL, and inline buttons
+    # Extract message, local image filename, and inline buttons
     args_text = " ".join(context.args)
     lines = args_text.split("\n")
-    
+
     message_text = None
-    photo_url = None
+    photo_path = None
     buttons = []
 
-    # Parsing lines to extract message, photo, and buttons
+    # Parsing lines to extract message, local image, and buttons
     for line in lines:
-        if line.startswith("http") and not photo_url:  # First link is assumed as photo URL
-            photo_url = line.strip()
+        if line.startswith("图片:"):  # If an image filename is specified
+            image_filename = line.replace("图片:", "").strip()
+            photo_path = os.path.join("images", image_filename)  # Assuming all images are in the "images" folder
         elif line.startswith("按钮:"):  # Extract buttons
             button_texts = line.replace("按钮:", "").strip().split("|")
             for button in button_texts:
@@ -225,13 +226,14 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     # Send the message to all stored user IDs
     for chat_id in user_chat_ids:
         try:
-            if photo_url:  # Send photo with message and buttons
-                await context.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=photo_url,
-                    caption=message_text if message_text else "📢 重要通知",
-                    reply_markup=inline_markup
-                )
+            if photo_path and os.path.exists(photo_path):  # Check if local image exists
+                with open(photo_path, "rb") as photo:
+                    await context.bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        caption=message_text if message_text else "📢 重要通知",
+                        reply_markup=inline_markup
+                    )
             else:  # Send only message and buttons
                 await context.bot.send_message(
                     chat_id=chat_id,
@@ -249,7 +251,6 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(
         f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
     )
-
 
 
 # /update command handler

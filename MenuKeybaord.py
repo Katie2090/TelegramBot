@@ -209,7 +209,7 @@ async def update_message_command(update: Update, context: CallbackContext) -> No
 
 # Main function to run the bot
 def main():
-    token = "YOUR_BOT_TOKEN"  # Replace with your bot token
+    token = "7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs"  # Replace with your bot token
 
     application = Application.builder().token(token).build()
     

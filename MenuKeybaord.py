@@ -196,7 +196,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
     # Extract the full message text (excluding /broadcast command)
     try:
-        message = update.message.text.split(" ", 1)[1]  # Extract text after /broadcast
+        message = " ".join(context.args)
     except IndexError:
         await update.message.reply_text("⚠️ 无效的格式，请提供要发送的消息。\n\n`/broadcast 这里是公告内容`")
         return
@@ -216,6 +216,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
     # Confirmation message for the sender
     await update.message.reply_text(f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人")
+
 
 # /update command handler
 async def update_message_command(update: Update, context: CallbackContext) -> None:

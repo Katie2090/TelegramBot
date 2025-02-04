@@ -169,7 +169,7 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
     else:
         await update.message.reply_text("未识别的选项，请选择菜单中的一个选项。")
 
-# /broadcast command handler (always sends the latest message)
+# /broadcast command - Always send the latest content
 async def broadcast(update: Update, context: CallbackContext) -> None:
     """Send a broadcast message with the latest content defined in the code."""
     user_chat_ids = load_user_chat_ids()
@@ -178,15 +178,15 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("⚠️ 没有已注册的用户，请确保用户已发送 /start 以注册。")
         return
 
-    # ✨ Define the latest broadcast message here! ✨
-    message_text = """🔥 强烈推荐！宿舍/新居生活必备超值套装！ 🔥
+    # ✨ Update these values to send a new broadcast message ✨
+    message_text = """🔥 **最新公告！宿舍/新居生活必备超值套装！** 🔥
 
-💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 “生活必备大礼包” 直接拯救你的日常所需！ 💪"""
+💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
 
-    # 🖼️ Define the latest image here! (Local path or URL)
-    photo_path = "images/卡通多种职业形象跳槽招聘海报.png"  # Ensure the file exists in the folder
+    # 🖼️ Change the image filename to send a new one (stored locally)
+    photo_path = "images/life_kit.jpg"  # Update the image file name
 
-    # 🔘 Define inline buttons here!
+    # 🔘 Update buttons if needed
     buttons = [
         [InlineKeyboardButton("💬 在线客服", url="https://t.me/HQBGSKF"),
          InlineKeyboardButton("📦 生活物资详情", url="https://t.me/+A0W4dKUEyzM1ZDRl")]
@@ -196,6 +196,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     sent_count = 0
     failed_count = 0
 
+    # 📢 Send the updated message to all registered users
     for chat_id in user_chat_ids:
         try:
             with open(photo_path, "rb") as photo:
@@ -203,6 +204,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
                     chat_id=chat_id,
                     photo=photo,
                     caption=message_text,
+                    parse_mode="Markdown",
                     reply_markup=inline_markup
                 )
             logger.info(f"✅ Sent message to {chat_id}")
@@ -211,7 +213,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
             logger.error(f"❌ Failed to send message to {chat_id}: {e}")
             failed_count += 1
 
-    # Confirmation message for sender
+    # Send confirmation message to the admin
     await update.message.reply_text(
         f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
     )

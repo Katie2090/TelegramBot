@@ -144,7 +144,7 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
         inline_markup = InlineKeyboardMarkup(inline_keyboard)
 
         await update.message.reply_photo(
-            photo="images/Screenshot 2025-02-03 173313.png",
+            photo="images/logistic.png",
             caption=" 主要提供各种后勤管理和生活服务，确保用户能够方便、高效地获取信息和帮助。\n\n"
                     "🚀 为什么选择 🔔 后勤生活信息频道？\n"
                     "✅ 一站式后勤服务：省时省力，所有需求一键获取！\n"

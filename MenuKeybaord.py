@@ -184,17 +184,17 @@ async def update_message(context: CallbackContext, chat_id: int, message_id: int
     except Exception as e:
         logger.error(f"❌ Failed to update message {message_id} for chat {chat_id}: {e}")
 
-# /broadcast command handler (for sending message, multiple local photos, and inline buttons)
+# /broadcast command handler (sends text, multiple local images, and buttons)
 async def broadcast(update: Update, context: CallbackContext) -> None:
-    """Send a broadcast message to all stored users with support for multiple images and inline buttons."""
+    """Send a broadcast message to all stored users with message, multiple images, and buttons."""
     user_chat_ids = load_user_chat_ids()
 
-    # Check if message content is provided
+    # Ensure a message is provided
     if not context.args:
         await update.message.reply_text("⚠️ 请输入要发送的公告内容，如：\n\n`/broadcast 这里是公告内容`")
         return
 
-    # Extract message, local image filenames, and inline buttons
+    # Extract message, image filenames, and buttons
     args_text = " ".join(context.args)
     lines = args_text.split("\n")
 
@@ -202,14 +202,16 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     photo_paths = []
     buttons = []
 
-    # Parsing lines to extract message, local images, and buttons
+    # Parsing lines
     for line in lines:
-        if line.startswith("图片:"):  # If an image filename is specified
+        if line.startswith("图片:"):  # If an image is specified
             image_filenames = line.replace("图片:", "").strip().split(",")  # Supports multiple images
             for image_filename in image_filenames:
-                photo_path = os.path.join("images", image_filename.strip())  # Assuming all images are in the "images" folder
+                photo_path = os.path.join("images", image_filename.strip())  # Assuming all images are in "images/"
                 if os.path.exists(photo_path):
                     photo_paths.append(photo_path)
+                else:
+                    logger.error(f"❌ Image not found: {photo_path}")
         elif line.startswith("按钮:"):  # Extract buttons
             button_texts = line.replace("按钮:", "").strip().split("|")
             for button in button_texts:
@@ -226,35 +228,32 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     sent_count = 0
     failed_count = 0
 
-    # Send the message to all stored user IDs
+    # Send message to all users
     for chat_id in user_chat_ids:
         try:
             if photo_paths:  # If images are provided, send them
                 media_group = []
                 for i, photo_path in enumerate(photo_paths):
                     with open(photo_path, "rb") as photo:
-                        if i == 0:
-                            media_group.append({"type": "photo", "media": photo, "caption": message_text if message_text else "📢 重要通知"})
-                        else:
-                            media_group.append({"type": "photo", "media": photo})
+                        media_group.append({"type": "photo", "media": photo})
 
+                # Send images as a group first
                 await context.bot.send_media_group(chat_id=chat_id, media=media_group)
-                if inline_markup:
-                    await context.bot.send_message(chat_id=chat_id, text="🔗 相关链接:", reply_markup=inline_markup)
-            else:  # Send only message and buttons
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=message_text if message_text else "📢 重要通知",
-                    reply_markup=inline_markup
-                )
-            
+
+            # Send text + buttons
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message_text if message_text else "📢 重要通知",
+                reply_markup=inline_markup
+            )
+
             logger.info(f"✅ Sent message to {chat_id}")
             sent_count += 1
         except Exception as e:
             logger.error(f"❌ Failed to send message to {chat_id}: {e}")
             failed_count += 1
 
-    # Confirmation message for the sender
+    # Confirmation message for sender
     await update.message.reply_text(
         f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
     )

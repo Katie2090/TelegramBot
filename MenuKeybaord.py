@@ -3,7 +3,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import logging
 import json
 import asyncio
-
+import os
 # Enable logging for debugging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -184,9 +184,9 @@ async def update_message(context: CallbackContext, chat_id: int, message_id: int
     except Exception as e:
         logger.error(f"❌ Failed to update message {message_id} for chat {chat_id}: {e}")
 
-# /broadcast command handler (for sending message, local photo, and inline buttons)
+# /broadcast command handler (for sending message, multiple local photos, and inline buttons)
 async def broadcast(update: Update, context: CallbackContext) -> None:
-    """Send a broadcast message to all stored users."""
+    """Send a broadcast message to all stored users with support for multiple images and inline buttons."""
     user_chat_ids = load_user_chat_ids()
 
     # Check if message content is provided
@@ -194,19 +194,22 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("⚠️ 请输入要发送的公告内容，如：\n\n`/broadcast 这里是公告内容`")
         return
 
-    # Extract message, local image filename, and inline buttons
+    # Extract message, local image filenames, and inline buttons
     args_text = " ".join(context.args)
     lines = args_text.split("\n")
 
     message_text = None
-    photo_path = None
+    photo_paths = []
     buttons = []
 
-    # Parsing lines to extract message, local image, and buttons
+    # Parsing lines to extract message, local images, and buttons
     for line in lines:
         if line.startswith("图片:"):  # If an image filename is specified
-            image_filename = line.replace("图片:", "").strip()
-            photo_path = os.path.join("images", image_filename)  # Assuming all images are in the "images" folder
+            image_filenames = line.replace("图片:", "").strip().split(",")  # Supports multiple images
+            for image_filename in image_filenames:
+                photo_path = os.path.join("images", image_filename.strip())  # Assuming all images are in the "images" folder
+                if os.path.exists(photo_path):
+                    photo_paths.append(photo_path)
         elif line.startswith("按钮:"):  # Extract buttons
             button_texts = line.replace("按钮:", "").strip().split("|")
             for button in button_texts:
@@ -226,14 +229,18 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     # Send the message to all stored user IDs
     for chat_id in user_chat_ids:
         try:
-            if photo_path and os.path.exists(photo_path):  # Check if local image exists
-                with open(photo_path, "rb") as photo:
-                    await context.bot.send_photo(
-                        chat_id=chat_id,
-                        photo=photo,
-                        caption=message_text if message_text else "📢 重要通知",
-                        reply_markup=inline_markup
-                    )
+            if photo_paths:  # If images are provided, send them
+                media_group = []
+                for i, photo_path in enumerate(photo_paths):
+                    with open(photo_path, "rb") as photo:
+                        if i == 0:
+                            media_group.append({"type": "photo", "media": photo, "caption": message_text if message_text else "📢 重要通知"})
+                        else:
+                            media_group.append({"type": "photo", "media": photo})
+
+                await context.bot.send_media_group(chat_id=chat_id, media=media_group)
+                if inline_markup:
+                    await context.bot.send_message(chat_id=chat_id, text="🔗 相关链接:", reply_markup=inline_markup)
             else:  # Send only message and buttons
                 await context.bot.send_message(
                     chat_id=chat_id,

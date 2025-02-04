@@ -186,13 +186,36 @@ async def update_message(context: CallbackContext, chat_id: int, message_id: int
 
 # /broadcast command handler (only for admins)
 async def broadcast(update: Update, context: CallbackContext) -> None:
+    """Send a broadcast message to all stored users."""
+    user_chat_ids = load_user_chat_ids()
+
+    # Check if the admin provided a message
     if not context.args:
         await update.message.reply_text("⚠️ 请输入要发送的公告内容，如：\n\n`/broadcast 这里是公告内容`")
         return
 
-    message = "📢 重要通知: " + " ".join(context.args)
-    await send_broadcast_message(context, message)
-    await update.message.reply_text("✅ 公告已发送给所有用户。")
+    # Extract the full message text (excluding /broadcast command)
+    try:
+        message = update.message.text.split(" ", 1)[1]  # Extract text after /broadcast
+    except IndexError:
+        await update.message.reply_text("⚠️ 无效的格式，请提供要发送的消息。\n\n`/broadcast 这里是公告内容`")
+        return
+
+    sent_count = 0
+    failed_count = 0
+
+    # Send the message to all stored user IDs
+    for chat_id in user_chat_ids:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=f"📢 重要通知:\n\n{message}")
+            logger.info(f"✅ Sent message to {chat_id}")
+            sent_count += 1
+        except Exception as e:
+            logger.error(f"❌ Failed to send message to {chat_id}: {e}")
+            failed_count += 1
+
+    # Confirmation message for the sender
+    await update.message.reply_text(f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人")
 
 # /update command handler
 async def update_message_command(update: Update, context: CallbackContext) -> None:

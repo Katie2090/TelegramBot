@@ -184,22 +184,40 @@ async def update_message(context: CallbackContext, chat_id: int, message_id: int
     except Exception as e:
         logger.error(f"❌ Failed to update message {message_id} for chat {chat_id}: {e}")
 
-# /broadcast command handler (only for admins)
+# /broadcast command handler (for sending message, photo, and inline buttons)
 async def broadcast(update: Update, context: CallbackContext) -> None:
     """Send a broadcast message to all stored users."""
     user_chat_ids = load_user_chat_ids()
 
-    # Check if the admin provided a message
+    # Check if message content is provided
     if not context.args:
         await update.message.reply_text("⚠️ 请输入要发送的公告内容，如：\n\n`/broadcast 这里是公告内容`")
         return
 
-    # Extract the full message text (excluding /broadcast command)
-    try:
-        message = " ".join(context.args)
-    except IndexError:
-        await update.message.reply_text("⚠️ 无效的格式，请提供要发送的消息。\n\n`/broadcast 这里是公告内容`")
-        return
+    # Extract message, photo URL, and inline buttons
+    args_text = " ".join(context.args)
+    lines = args_text.split("\n")
+    
+    message_text = None
+    photo_url = None
+    buttons = []
+
+    # Parsing lines to extract message, photo, and buttons
+    for line in lines:
+        if line.startswith("http") and not photo_url:  # First link is assumed as photo URL
+            photo_url = line.strip()
+        elif line.startswith("按钮:"):  # Extract buttons
+            button_texts = line.replace("按钮:", "").strip().split("|")
+            for button in button_texts:
+                text, url = button.strip().split(",")
+                buttons.append([InlineKeyboardButton(text.strip(), url=url.strip())])
+        else:
+            if not message_text:
+                message_text = line.strip()
+            else:
+                message_text += "\n" + line.strip()
+
+    inline_markup = InlineKeyboardMarkup(buttons) if buttons else None
 
     sent_count = 0
     failed_count = 0
@@ -207,7 +225,20 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     # Send the message to all stored user IDs
     for chat_id in user_chat_ids:
         try:
-            await context.bot.send_message(chat_id=chat_id, text=f"📢 重要通知:\n\n{message}")
+            if photo_url:  # Send photo with message and buttons
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=photo_url,
+                    caption=message_text if message_text else "📢 重要通知",
+                    reply_markup=inline_markup
+                )
+            else:  # Send only message and buttons
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message_text if message_text else "📢 重要通知",
+                    reply_markup=inline_markup
+                )
+            
             logger.info(f"✅ Sent message to {chat_id}")
             sent_count += 1
         except Exception as e:
@@ -215,7 +246,10 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
             failed_count += 1
 
     # Confirmation message for the sender
-    await update.message.reply_text(f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人")
+    await update.message.reply_text(
+        f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
+    )
+
 
 
 # /update command handler

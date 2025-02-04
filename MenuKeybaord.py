@@ -188,9 +188,8 @@ async def update_message(context: CallbackContext, chat_id: int, message_id: int
     except Exception as e:
         logger.error(f"❌ Failed to update message {message_id} for chat {chat_id}: {e}")
 
-# /broadcast command handler (sends text, multiple local images, and buttons)
 async def broadcast(update: Update, context: CallbackContext) -> None:
-    """Send a broadcast message with a caption, photo, and inline buttons in a single message."""
+    """Send a **new post** broadcast message with a photo, caption, and inline buttons to all users."""
     user_chat_ids = load_user_chat_ids()
 
     if not user_chat_ids:
@@ -235,7 +234,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     for chat_id in user_chat_ids:
         try:
             if photo_path:
-                # Send the image with caption and buttons
+                # Send as a **new message post** with an image, caption, and buttons
                 with open(photo_path, "rb") as photo:
                     await context.bot.send_photo(
                         chat_id=chat_id,
@@ -244,14 +243,14 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
                         reply_markup=inline_markup
                     )
             else:
-                # Send only text and buttons
+                # Send only text and buttons as a **new message post**
                 await context.bot.send_message(
                     chat_id=chat_id,
                     text=message_text if message_text else "📢 重要通知",
                     reply_markup=inline_markup
                 )
 
-            logger.info(f"✅ Sent message to {chat_id}")
+            logger.info(f"✅ Sent new post to {chat_id}")
             sent_count += 1
         except Exception as e:
             logger.error(f"❌ Failed to send message to {chat_id}: {e}")
@@ -259,7 +258,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
     # Confirmation message for sender
     await update.message.reply_text(
-        f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
+        f"✅ **广播消息已发布！**\n📨 **成功:** {sent_count} 人\n⚠️ **失败:** {failed_count} 人"
     )
 
 # /update command handler

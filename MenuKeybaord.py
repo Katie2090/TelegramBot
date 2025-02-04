@@ -184,7 +184,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
 
     # 🖼️ Change the image filename to send a new one (stored locally)
-    photo_path = "images/life_kit.jpg"  # Update the image file name
+    photo_path = "images/工卡.jpg"  # Update the image file name
 
     # 🔘 Update buttons if needed
     buttons = [

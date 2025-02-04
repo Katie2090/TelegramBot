@@ -189,64 +189,41 @@ async def update_message(context: CallbackContext, chat_id: int, message_id: int
         logger.error(f"❌ Failed to update message {message_id} for chat {chat_id}: {e}")
 
 async def broadcast(update: Update, context: CallbackContext) -> None:
-    """Send a broadcast message with a caption, photo, and inline buttons in a single message."""
+    """Send a broadcast message with a predefined caption, photo, and inline buttons in a single message."""
+    
     user_chat_ids = load_user_chat_ids()
-
+    
     if not user_chat_ids:
         await update.message.reply_text("⚠️ 没有已注册的用户，请确保用户已发送 /start 以注册。")
         return
 
-    if not context.args:
-        await update.message.reply_text("⚠️ 请输入要发送的公告内容，如：\n\n`/broadcast 这里是公告内容`")
-        return
+    # Predefined message, image, and buttons
+    message_text = """🔥 强烈推荐！宿舍/新居生活必备超值套装！ 🔥
 
-    # Extract message, image filenames, and buttons
-    args_text = " ".join(context.args)
-    lines = args_text.split("\n")
+💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 “生活必备大礼包” 直接拯救你的日常所需！ 💪"""
 
-    message_text = None
-    photo_url = None  # Store GitHub raw image URL
-    buttons = []
+    # Use GitHub Raw URL for the image
+    photo_url = "images/工卡.jpg"
 
-    for line in lines:
-        if line.startswith("图片:"):
-            image_filename = line.replace("图片:", "").strip()
-            # Construct GitHub Raw URL
-            photo_url = f"https://raw.githubusercontent.com/Katie2090/TelegramBot/main/images/{image_filename}"
-        elif line.startswith("按钮:"):
-            button_texts = line.replace("按钮:", "").strip().split("|")
-            for button in button_texts:
-                try:
-                    text, url = button.strip().split(",")
-                    buttons.append([InlineKeyboardButton(text.strip(), url=url.strip())])
-                except ValueError:
-                    logger.error(f"❌ Invalid button format: {button}")
-        else:
-            message_text = line.strip() if message_text is None else message_text + "\n" + line.strip()
-
-    inline_markup = InlineKeyboardMarkup(buttons) if buttons else None
+    # Define inline buttons
+    buttons = [
+        [InlineKeyboardButton("💬 在线客服", url="https://t.me/HQBGSKF"),
+         InlineKeyboardButton("📦 生活物资详情", url="https://t.me/+A0W4dKUEyzM1ZDRl")]
+    ]
+    inline_markup = InlineKeyboardMarkup(buttons)
 
     sent_count = 0
     failed_count = 0
 
     for chat_id in user_chat_ids:
         try:
-            if photo_url:
-                # Send image with caption and buttons
-                await context.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=photo_url,
-                    caption=message_text if message_text else "📢 重要通知",
-                    reply_markup=inline_markup
-                )
-            else:
-                # Send only text and buttons
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=message_text if message_text else "📢 重要通知",
-                    reply_markup=inline_markup
-                )
-
+            # Send the image with caption and buttons
+            await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=photo_url,
+                caption=message_text,
+                reply_markup=inline_markup
+            )
             logger.info(f"✅ Sent message to {chat_id}")
             sent_count += 1
         except Exception as e:

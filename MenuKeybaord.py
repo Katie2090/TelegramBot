@@ -169,43 +169,24 @@ async def handle_menu_selection(update: Update, context: CallbackContext) -> Non
     else:
         await update.message.reply_text("未识别的选项，请选择菜单中的一个选项。")
 
-# Function to send a broadcast message
-async def send_broadcast_message(context: CallbackContext, message: str):
-    user_chat_ids = load_user_chat_ids()
-
-    for chat_id in user_chat_ids:
-        try:
-            await context.bot.send_message(chat_id=chat_id, text=message)
-            logger.info(f"✅ Sent message to {chat_id}")
-        except Exception as e:
-            logger.error(f"❌ Failed to send message to {chat_id}: {e}")
-
-# Function to update an existing message
-async def update_message(context: CallbackContext, chat_id: int, message_id: int, new_message: str):
-    try:
-        await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=new_message)
-        logger.info(f"✅ Updated message {message_id} for chat {chat_id}")
-    except Exception as e:
-        logger.error(f"❌ Failed to update message {message_id} for chat {chat_id}: {e}")
-
+# /broadcast command handler (always sends the latest message)
 async def broadcast(update: Update, context: CallbackContext) -> None:
-    """Send a broadcast message with a predefined caption, photo, and inline buttons in a single message."""
-    
+    """Send a broadcast message with the latest content defined in the code."""
     user_chat_ids = load_user_chat_ids()
     
     if not user_chat_ids:
         await update.message.reply_text("⚠️ 没有已注册的用户，请确保用户已发送 /start 以注册。")
         return
 
-    # Predefined message, image, and buttons
+    # ✨ Define the latest broadcast message here! ✨
     message_text = """🔥 强烈推荐！宿舍/新居生活必备超值套装！ 🔥
 
 💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 “生活必备大礼包” 直接拯救你的日常所需！ 💪"""
 
-    # Use GitHub Raw URL for the image
-    photo_url = "images/卡通多种职业形象跳槽招聘海报.png"
+    # 🖼️ Define the latest image here! (Local path or URL)
+    photo_path = "images/工卡.jpg"  # Ensure the file exists in the folder
 
-    # Define inline buttons
+    # 🔘 Define inline buttons here!
     buttons = [
         [InlineKeyboardButton("💬 在线客服", url="https://t.me/HQBGSKF"),
          InlineKeyboardButton("📦 生活物资详情", url="https://t.me/+A0W4dKUEyzM1ZDRl")]
@@ -217,13 +198,13 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
     for chat_id in user_chat_ids:
         try:
-            # Send the image with caption and buttons
-            await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=photo_url,
-                caption=message_text,
-                reply_markup=inline_markup
-            )
+            with open(photo_path, "rb") as photo:
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=photo,
+                    caption=message_text,
+                    reply_markup=inline_markup
+                )
             logger.info(f"✅ Sent message to {chat_id}")
             sent_count += 1
         except Exception as e:
@@ -234,7 +215,6 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(
         f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
     )
-
 
 # /update command handler
 async def update_message_command(update: Update, context: CallbackContext) -> None:

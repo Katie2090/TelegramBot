@@ -203,7 +203,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 “生活必备大礼包” 直接拯救你的日常所需！ 💪"""
 
     # Use GitHub Raw URL for the image
-    photo_url = "images/工卡.jpg"
+    photo_url = "images/卡通多种职业形象跳槽招聘海报.png"
 
     # Define inline buttons
     buttons = [

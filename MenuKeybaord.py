@@ -82,7 +82,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
 
     # 🖼️ Image file (stored locally)
-    photo_path = "images/工卡.jpg"
+    photo_path = "images/笔记本.jpg"
 
     # 🔘 Inline buttons
     buttons = [

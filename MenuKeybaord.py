@@ -119,17 +119,18 @@ async def auto_broadcast(context: CallbackContext) -> None:
         except Exception as e:
             logger.error(f"❌ 发送失败: {chat_id}: {e}")
 
-# ✅ Main Function
+# ✅ Main Function with FIXED JobQueue
 def main():
     token = "7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs"  # 🔹 Replace with your actual bot token
 
     application = Application.builder().token(token).build()
-    
+
+    # ✅ Initialize JobQueue properly
+    job_queue = application.job_queue
+    job_queue.run_once(auto_broadcast, when=10)  # Schedule auto broadcast after 10 seconds
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("broadcast", broadcast))
-
-    # Automatically send updates when the bot restarts
-    application.job_queue.run_once(auto_broadcast, 10)  # Send after 10 seconds
 
     logger.info("Starting bot...")
     application.run_polling()

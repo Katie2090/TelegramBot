@@ -1,71 +1,67 @@
-import json
 import os
-import subprocess
 import logging
+import mysql.connector
+from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext
 
-# ✅ Enable logging for debugging
+# ✅ Load environment variables from .env
+load_dotenv()
+
+# ✅ Database Connection
+def connect_db():
+    return mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST"),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DATABASE"),
+    )
+
+# ✅ Initialize Database Table
+def init_db():
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS users (
+            chat_id BIGINT PRIMARY KEY
+        )"""
+    )
+    conn.commit()
+    conn.close()
+
+# ✅ Save User to MySQL
+def add_user(chat_id):
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO users (chat_id) VALUES (%s) ON DUPLICATE KEY UPDATE chat_id=VALUES(chat_id)", (chat_id,))
+    conn.commit()
+    conn.close()
+
+# ✅ Get All Users
+def get_all_users():
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT chat_id FROM users")
+    users = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return users
+
+# ✅ Remove Failed Users
+def remove_user(chat_id):
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE chat_id=%s", (chat_id,))
+    conn.commit()
+    conn.close()
+
+# ✅ Enable logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ✅ Define the Persistent JSON File
-DATA_FOLDER = "data"
-USER_CHAT_IDS_FILE = os.path.join(DATA_FOLDER, "user_chat_ids.json")
-
-# 🔹 Ensure the `data/` folder exists
-os.makedirs(DATA_FOLDER, exist_ok=True)
-
-# 🔹 Load user chat IDs from the JSON file
-def load_user_chat_ids():
-    """Load user IDs from a JSON file (persistent storage)."""
-    if os.path.exists(USER_CHAT_IDS_FILE):
-        try:
-            with open(USER_CHAT_IDS_FILE, "r") as file:
-                return json.load(file)
-        except json.JSONDecodeError:
-            return []  # Return an empty list if the file is corrupted
-    return []
-
-# 🔹 Save user chat IDs and Auto-Commit to GitHub
-def save_user_chat_ids(user_chat_ids):
-    """Save user IDs to a JSON file and commit to GitHub if there are changes."""
-    old_data = load_user_chat_ids()  # Load existing users
-    if set(old_data) == set(user_chat_ids):  # No changes? Skip commit
-        return
-
-    with open(USER_CHAT_IDS_FILE, "w") as file:
-        json.dump(user_chat_ids, file, indent=4)
-
-    # ✅ Git commit and push
-    try:
-        subprocess.run(["git", "add", USER_CHAT_IDS_FILE], check=True)
-        subprocess.run(["git", "commit", "-m", "Update user list"], check=True)
-        subprocess.run(["git", "push", "origin", "main"], check=True)
-        logger.info("✅ User list updated and pushed to GitHub!")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"❌ Git operation failed: {e}")
-
-# 🔹 Add User to JSON File
-def add_user(chat_id):
-    """Add a user to the JSON file if not already saved."""
-    user_chat_ids = load_user_chat_ids()
-    if chat_id not in user_chat_ids:
-        user_chat_ids.append(chat_id)
-        save_user_chat_ids(user_chat_ids)
-
-# 🔹 Get All Users from JSON File
-def get_all_users():
-    """Retrieve all saved user IDs."""
-    return load_user_chat_ids()
-
 # ✅ /start Command - Register Users
 async def start(update: Update, context: CallbackContext) -> None:
-    """Register users when they click /start (stored in JSON)."""
     chat_id = update.message.chat_id
-
-    # Save user ID permanently in JSON
-    add_user(chat_id)
+    add_user(chat_id)  # Save user ID to MySQL
 
     keyboard = [
         [KeyboardButton("✈ 落地接机"), KeyboardButton("🔖 证照办理"), KeyboardButton("🏤 房产凭租")],
@@ -78,7 +74,6 @@ async def start(update: Update, context: CallbackContext) -> None:
 
 # ✅ /broadcast Command - Send Message to All Users
 async def broadcast(update: Update, context: CallbackContext) -> None:
-    """Send a broadcast message to all saved users."""
     user_chat_ids = get_all_users()
     
     if not user_chat_ids:
@@ -90,8 +85,8 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
 💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
 
-    # 🖼️ Image file (stored locally)
-    photo_path = "images/工卡.jpg"  # Ensure the file exists in the correct folder
+    # 🖼️ Image file
+    photo_path = "images/工卡.jpg"
 
     # 🔘 Inline buttons
     buttons = [
@@ -122,10 +117,9 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
             failed_count += 1
             failed_users.append(chat_id)  # Mark user as failed
 
-    # Remove failed users from the JSON file
-    if failed_users:
-        user_chat_ids = [u for u in user_chat_ids if u not in failed_users]
-        save_user_chat_ids(user_chat_ids)
+    # Remove failed users from MySQL
+    for failed_user in failed_users:
+        remove_user(failed_user)
 
     await update.message.reply_text(
         f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
@@ -133,7 +127,6 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
 # ✅ Auto-broadcast on bot restart
 async def auto_broadcast(context: CallbackContext) -> None:
-    """Auto-send a message to all users when the bot restarts."""
     user_chat_ids = get_all_users()
     message_text = "🔄 **机器人已重新启动！请查看最新信息！**"
 
@@ -143,15 +136,18 @@ async def auto_broadcast(context: CallbackContext) -> None:
         except Exception as e:
             logger.error(f"❌ 发送失败: {chat_id}: {e}")
 
-# ✅ Main Function with FIXED JobQueue
+# ✅ Main Function with JobQueue
 def main():
-    token = "7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs"  # 🔹 Replace with your actual bot token
+    token = os.getenv("TELEGRAM_BOT_TOKEN")  # 🔹 Use .env variable for security
 
     application = Application.builder().token(token).build()
 
+    # ✅ Initialize MySQL Table
+    init_db()
+
     # ✅ Initialize JobQueue properly
     job_queue = application.job_queue
-    job_queue.run_once(auto_broadcast, when=10)  # Schedule auto broadcast after 10 seconds
+    job_queue.run_once(auto_broadcast, when=10)
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("broadcast", broadcast))

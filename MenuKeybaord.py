@@ -68,10 +68,12 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
         return
 
     # ✨ Broadcast message content
-    message_text = """HIII"""
+    message_text = """🔥 **最新公告！宿舍/新居生活必备超值套装！** 🔥
+
+💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
 
     # 🖼️ Image file (stored locally)
-    photo_path = "images/笔记本.jpg"
+    photo_path = "images/工卡.jpg"
 
     # 🔘 Inline buttons
     buttons = [
@@ -106,16 +108,16 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     )
 
 # ✅ Auto-broadcast on bot restart
- async def auto_broadcast(context: CallbackContext) -> None:
-     """Auto-send a message to all users when the bot restarts."""
+async def auto_broadcast(context: CallbackContext) -> None:
+    """Auto-send a message to all users when the bot restarts."""
     user_chat_ids = get_all_users()
-     message_text = "🔄 **机器人已重新启动！请查看最新信息！**"
+    message_text = "🔄 **机器人已重新启动！请查看最新信息！**"
 
-     for chat_id in user_chat_ids:
-         try:
-             await context.bot.send_message(chat_id=chat_id, text=message_text, parse_mode="Markdown")
-         except Exception as e:
-             logger.error(f"❌ 发送失败: {chat_id}: {e}")
+    for chat_id in user_chat_ids:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=message_text, parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"❌ 发送失败: {chat_id}: {e}")
 
 # ✅ Main Function with FIXED JobQueue
 def main():

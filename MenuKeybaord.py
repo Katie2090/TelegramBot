@@ -130,7 +130,7 @@ async def auto_broadcast(context: CallbackContext) -> None:
 
 # ✅ Main Function with FIXED JobQueue
 def main():
-    token = "YOUR_BOT_TOKEN"  # 🔹 Replace with your actual bot token
+    token = "7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs"  # 🔹 Replace with your actual bot token
 
     application = Application.builder().token(token).build()
 

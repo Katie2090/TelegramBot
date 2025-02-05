@@ -1,43 +1,51 @@
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 import logging
-import sqlite3
+import mysql.connector
 import os
 
 # Enable logging for debugging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database file
-DB_FILE = "subscribers.db"
+# MySQL Database Configuration (Replace with your MySQL/Navicat details)
+DB_CONFIG = {
+    "host": "localhost",   # e.g., "127.0.0.1" or your server IP
+    "user": "root",   # e.g., "root"
+    "password": "",
+    "database": "telegrambot"   # The database you created in Navicat
+}
 
 # Initialize database
 def initialize_database():
-    """Create the database table if it doesn't exist."""
-    conn = sqlite3.connect(DB_FILE)
+    """Create the subscribers table if it doesn't exist."""
+    conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS subscribers (
-            chat_id INTEGER PRIMARY KEY
+            chat_id BIGINT PRIMARY KEY
         )
     """)
     conn.commit()
+    cursor.close()
     conn.close()
 
 def add_user(chat_id):
     """Add a user to the database if they are not already stored."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO subscribers (chat_id) VALUES (?)", (chat_id,))
+    cursor.execute("INSERT IGNORE INTO subscribers (chat_id) VALUES (%s)", (chat_id,))
     conn.commit()
+    cursor.close()
     conn.close()
 
 def get_all_users():
     """Retrieve all stored user chat IDs."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
     cursor.execute("SELECT chat_id FROM subscribers")
     users = [row[0] for row in cursor.fetchall()]
+    cursor.close()
     conn.close()
     return users
 
@@ -111,7 +119,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 async def auto_broadcast(context: CallbackContext) -> None:
     """Auto-send a message to all users when the bot starts."""
     user_chat_ids = get_all_users()
-    message_text = "🔄 **机器人已更新！请查看最新信息！**"
+    message_text = "🔄 **机器人已重新启动！请查看最新信息！**"
 
     for chat_id in user_chat_ids:
         try:

@@ -1,60 +1,52 @@
+import json
+import os
+import logging
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-import logging
-import mysql.connector
-import os
 
-# Enable logging for debugging
+# ✅ Enable logging for debugging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# MySQL Database Configuration (Replace with your MySQL/Navicat details)
-DB_CONFIG = {
-    "host": "localhost",   # e.g., "127.0.0.1" or your server IP
-    "user": "root",   # e.g., "root"
-    "password": "",
-    "database": "telegrambot"   # The database you created in Navicat
-}
+# ✅ JSON File to Store User IDs
+USER_CHAT_IDS_FILE = "user_chat_ids.json"
 
-# Initialize database
-def initialize_database():
-    """Create the subscribers table if it doesn't exist."""
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS subscribers (
-            chat_id BIGINT PRIMARY KEY
-        )
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
+# 🔹 Load user chat IDs from the JSON file
+def load_user_chat_ids():
+    """Load user IDs from a JSON file (persistent storage)."""
+    if os.path.exists(USER_CHAT_IDS_FILE):
+        try:
+            with open(USER_CHAT_IDS_FILE, "r") as file:
+                return json.load(file)
+        except json.JSONDecodeError:
+            return []  # Return an empty list if the file is corrupted
+    return []
 
+# 🔹 Save user chat IDs to the JSON file
+def save_user_chat_ids(user_chat_ids):
+    """Save user IDs to a JSON file."""
+    with open(USER_CHAT_IDS_FILE, "w") as file:
+        json.dump(user_chat_ids, file)
+
+# 🔹 Add User to JSON File
 def add_user(chat_id):
-    """Add a user to the database if they are not already stored."""
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor()
-    cursor.execute("INSERT IGNORE INTO subscribers (chat_id) VALUES (%s)", (chat_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    """Add a user to the JSON file if not already saved."""
+    user_chat_ids = load_user_chat_ids()
+    if chat_id not in user_chat_ids:
+        user_chat_ids.append(chat_id)
+        save_user_chat_ids(user_chat_ids)
 
+# 🔹 Get All Users from JSON File
 def get_all_users():
-    """Retrieve all stored user chat IDs."""
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor()
-    cursor.execute("SELECT chat_id FROM subscribers")
-    users = [row[0] for row in cursor.fetchall()]
-    cursor.close()
-    conn.close()
-    return users
+    """Retrieve all saved user IDs."""
+    return load_user_chat_ids()
 
-# /start command handler
+# ✅ /start Command
 async def start(update: Update, context: CallbackContext) -> None:
-    """Register new users in the database when they click /start."""
+    """Register users when they click /start (stored in JSON)."""
     chat_id = update.message.chat_id
 
-    # Add user to database
+    # Save user ID permanently in JSON
     add_user(chat_id)
 
     keyboard = [
@@ -66,7 +58,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 
     await update.message.reply_text("欢迎使用机器人服务，请选择一个选项:", reply_markup=reply_markup)
 
-# /broadcast command - Send message to all saved users
+# ✅ /broadcast Command
 async def broadcast(update: Update, context: CallbackContext) -> None:
     """Send a broadcast message to all saved users."""
     user_chat_ids = get_all_users()
@@ -75,15 +67,15 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("⚠️ 没有已注册的用户，请确保用户已发送 /start 以注册。")
         return
 
-    # ✨ Update these values to send a new broadcast message ✨
+    # ✨ Broadcast message content
     message_text = """🔥 **最新公告！宿舍/新居生活必备超值套装！** 🔥
 
 💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
 
-    # 🖼️ Change the image filename to send a new one (stored locally)
+    # 🖼️ Image file (stored locally)
     photo_path = "images/最新公告.jpg"
 
-    # 🔘 Update buttons if needed
+    # 🔘 Inline buttons
     buttons = [
         [InlineKeyboardButton("💬 在线客服", url="https://t.me/HQBGSKF"),
          InlineKeyboardButton("📦 生活物资详情", url="https://t.me/+A0W4dKUEyzM1ZDRl")]
@@ -93,7 +85,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
     sent_count = 0
     failed_count = 0
 
-    # 📢 Send the updated message to all registered users
+    # 📢 Send messages to all users
     for chat_id in user_chat_ids:
         try:
             with open(photo_path, "rb") as photo:
@@ -110,14 +102,14 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
             logger.error(f"❌ Failed to send message to {chat_id}: {e}")
             failed_count += 1
 
-    # Send confirmation message to the admin
+    # Notify the admin of the results
     await update.message.reply_text(
         f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
     )
 
-# Auto-broadcast to all users when the bot restarts
+# ✅ Auto-broadcast on bot restart
 async def auto_broadcast(context: CallbackContext) -> None:
-    """Auto-send a message to all users when the bot starts."""
+    """Auto-send a message to all users when the bot restarts."""
     user_chat_ids = get_all_users()
     message_text = "🔄 **机器人已重新启动！请查看最新信息！**"
 
@@ -127,12 +119,9 @@ async def auto_broadcast(context: CallbackContext) -> None:
         except Exception as e:
             logger.error(f"❌ 发送失败: {chat_id}: {e}")
 
-# Main function to run the bot
+# ✅ Main Function
 def main():
-    token = "7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs"  # Replace with your bot token
-
-    # Initialize database
-    initialize_database()
+    token = "7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs"  # 🔹 Replace with your actual bot token
 
     application = Application.builder().token(token).build()
     

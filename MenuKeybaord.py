@@ -179,12 +179,10 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
         return
 
     # ✨ Update these values to send a new broadcast message ✨
-    message_text = """🔥 **最新公告！宿舍/新居生活必备超值套装！** 🔥
-
-💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
+    message_text = """🔥Hiii"""
 
     # 🖼️ Change the image filename to send a new one (stored locally)
-    photo_path = "images/卡通多种职业形象跳槽招聘海报.png"  # Update the image file name
+    photo_path = "images/工卡.jpg"  # Update the image file name
 
     # 🔘 Update buttons if needed
     buttons = [

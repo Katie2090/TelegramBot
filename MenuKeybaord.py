@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import logging
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext
@@ -28,14 +29,22 @@ def load_user_chat_ids():
 
 # 🔹 Save user chat IDs and Auto-Commit to GitHub
 def save_user_chat_ids(user_chat_ids):
-    """Save user IDs to a JSON file and commit to GitHub."""
+    """Save user IDs to a JSON file and commit to GitHub if there are changes."""
+    old_data = load_user_chat_ids()  # Load existing users
+    if set(old_data) == set(user_chat_ids):  # No changes? Skip commit
+        return
+
     with open(USER_CHAT_IDS_FILE, "w") as file:
         json.dump(user_chat_ids, file, indent=4)
 
-    # ✅ Auto-commit changes to GitHub
-    os.system("git add data/user_chat_ids.json")
-    os.system('git commit -m "Update user list"')
-    os.system("git push origin main")
+    # ✅ Git commit and push
+    try:
+        subprocess.run(["git", "add", USER_CHAT_IDS_FILE], check=True)
+        subprocess.run(["git", "commit", "-m", "Update user list"], check=True)
+        subprocess.run(["git", "push", "origin", "main"], check=True)
+        logger.info("✅ User list updated and pushed to GitHub!")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"❌ Git operation failed: {e}")
 
 # 🔹 Add User to JSON File
 def add_user(chat_id):

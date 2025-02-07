@@ -1,160 +1,178 @@
 import os
+import json
 import logging
-import mysql.connector
-import dotenv
-from dotenv import load_dotenv
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackContext
+import firebase_admin
+from firebase_admin import credentials, firestore
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
-# ✅ Load environment variables from .env
-load_dotenv()
-
-# ✅ Database Connection
-def connect_db():
-    return mysql.connector.connect(
-        host=os.getenv("MYSQL_HOST"),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DATABASE"),
-    )
-
-# ✅ Initialize Database Table
-def init_db():
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        """CREATE TABLE IF NOT EXISTS users (
-            chat_id BIGINT PRIMARY KEY
-        )"""
-    )
-    conn.commit()
-    conn.close()
-
-# ✅ Save User to MySQL
-def add_user(chat_id):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO users (chat_id) VALUES (%s) ON DUPLICATE KEY UPDATE chat_id=VALUES(chat_id)", (chat_id,))
-    conn.commit()
-    conn.close()
-
-# ✅ Get All Users
-def get_all_users():
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT chat_id FROM users")
-    users = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return users
-
-# ✅ Remove Failed Users
-def remove_user(chat_id):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE chat_id=%s", (chat_id,))
-    conn.commit()
-    conn.close()
-
-# ✅ Enable logging
+# Enable logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ✅ /start Command - Register Users
+# Load Firebase credentials from environment variable
+firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
+if firebase_credentials:
+    cred_dict = json.loads(firebase_credentials)
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+else:
+    logger.error("❌ FIREBASE_CREDENTIALS environment variable not set.")
+
+# Collection name in Firestore
+USER_COLLECTION = "telegram_users"
+MESSAGE_COLLECTION = "sent_messages"
+
+
+# Store user chat IDs in Firestore
+def save_user_chat_id(chat_id):
+    doc_ref = db.collection(USER_COLLECTION).document(str(chat_id))
+    doc_ref.set({"chat_id": chat_id})
+
+
+# Load all user chat IDs from Firestore
+def load_user_chat_ids():
+    users = db.collection(USER_COLLECTION).stream()
+    return [user.id for user in users]
+
+
+# Store message ID in Firestore (for editing messages later)
+def save_message_id(chat_id, message_id):
+    db.collection(MESSAGE_COLLECTION).document(str(chat_id)).set({"message_id": message_id})
+
+
+# Get stored message ID (for editing)
+def get_message_id(chat_id):
+    doc = db.collection(MESSAGE_COLLECTION).document(str(chat_id)).get()
+    return doc.to_dict().get("message_id") if doc.exists else None
+
+
+# /start command - Registers users and displays menu buttons
 async def start(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
-    add_user(chat_id)  # Save user ID to MySQL
+    save_user_chat_id(chat_id)
 
     keyboard = [
-        [KeyboardButton("✈ 落地接机"), KeyboardButton("🔖 证照办理"), KeyboardButton("🏤 房产凭租")],
-        [KeyboardButton("🏩 酒店预订"), KeyboardButton("🍽️ 食堂信息"), KeyboardButton("📦 生活物资")],
-        [KeyboardButton("🔔 后勤生活信息频道")],
+        [KeyboardButton("✈ 落地接机"), KeyboardButton("🔖 证照办理")],
+        [KeyboardButton("🏤 房产租赁"), KeyboardButton("🏩 酒店预订")],
+        [KeyboardButton("🍽️ 食堂信息"), KeyboardButton("📦 生活物资")],
+        [KeyboardButton("🔔 后勤生活信息频道")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
-    await update.message.reply_text("✅ 你已成功订阅广播消息！", reply_markup=reply_markup)
+    await update.message.reply_text("✅ 你已成功注册，可接收最新公告！\n请选择一个服务：", reply_markup=reply_markup)
 
-# ✅ /broadcast Command - Send Message to All Users
+
+# /broadcast command - Sends messages, images, and buttons to all users
 async def broadcast(update: Update, context: CallbackContext) -> None:
-    user_chat_ids = get_all_users()
-    
+    user_chat_ids = load_user_chat_ids()
     if not user_chat_ids:
-        await update.message.reply_text("⚠️ 没有已注册的用户，请确保用户已发送 /start 以注册。")
+        await update.message.reply_text("❌ 没有注册用户，无法发送公告。")
         return
 
-    # ✨ Broadcast message content
-    message_text = """🔥 **最新公告！宿舍/新居生活必备超值套装！** 🔥
+    message_text = update.message.text.split("\n")
+    if message_text[0].startswith("/broadcast"):
+        message_text.pop(0)  # Remove the first line
 
-💡 你是否刚搬进新宿舍？刚入住新公寓？还是在为日常生活物资发愁？不用担心！这套 **“生活必备大礼包”** 直接拯救你的日常所需！💪"""
+    if len(message_text) < 2:
+        await update.message.reply_text("⚠️ 请输入公告内容格式:\n\n"
+                                        "<b>标题 (加粗)</b>\n"
+                                        "主要内容\n"
+                                        "(可选) 图片URL 或 图片文件名\n"
+                                        "(可选) 按钮格式: `按钮文本|链接`",
+                                        parse_mode="HTML")
+        return
 
-    # 🖼️ Image file
-    photo_path = "images/工卡.jpg"
+    # Extract title, body text, images, and buttons
+    title = f"{message_text[0]}\n\n" if message_text[0] else ""
+    body_text = []
+    images = []
+    buttons = []
 
-    # 🔘 Inline buttons
-    buttons = [
-        [InlineKeyboardButton("💬 在线客服", url="https://t.me/HQBGSKF"),
-         InlineKeyboardButton("📦 生活物资详情", url="https://t.me/+A0W4dKUEyzM1ZDRl")]
-    ]
-    inline_markup = InlineKeyboardMarkup(buttons)
+    for line in message_text[1:]:
+        line = line.strip()
+        if line.startswith("http") and (".jpg" in line or ".png" in line):
+            images.append(line)
+        elif "|" in line:
+            button_row = [InlineKeyboardButton(*btn.strip().split("|", 1)) for btn in line.split(",")]
+            buttons.append(button_row)
+        else:
+            body_text.append(line)
 
-    sent_count = 0
-    failed_count = 0
-    failed_users = []
+    message_content = title + "\n".join(body_text)
+    inline_markup = InlineKeyboardMarkup(buttons) if buttons else None
 
-    # 📢 Send messages to all users
+    success_count, failure_count = 0, 0
     for chat_id in user_chat_ids:
         try:
-            with open(photo_path, "rb") as photo:
-                await context.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=photo,
-                    caption=message_text,
-                    parse_mode="Markdown",
-                    reply_markup=inline_markup
-                )
-            logger.info(f"✅ Sent message to {chat_id}")
-            sent_count += 1
+            if images:
+                sent_media = await context.bot.send_photo(chat_id=chat_id, photo=images[0], caption=message_content, reply_markup=inline_markup, parse_mode="HTML")
+                save_message_id(chat_id, sent_media.message_id)
+            else:
+                sent_message = await context.bot.send_message(chat_id=chat_id, text=message_content, reply_markup=inline_markup, parse_mode="HTML")
+                save_message_id(chat_id, sent_message.message_id)
+
+            success_count += 1
         except Exception as e:
-            logger.error(f"❌ Failed to send message to {chat_id}: {e}")
-            failed_count += 1
-            failed_users.append(chat_id)  # Mark user as failed
+            logger.error(f"❌ 发送失败给 {chat_id}: {e}")
+            failure_count += 1
 
-    # Remove failed users from MySQL
-    for failed_user in failed_users:
-        remove_user(failed_user)
+    await update.message.reply_text(f"✅ 公告已发送！成功: {success_count}，失败: {failure_count}")
 
-    await update.message.reply_text(
-        f"✅ 广播消息已发送！\n📨 成功: {sent_count} 人\n⚠️ 失败: {failed_count} 人"
-    )
 
-# ✅ Auto-broadcast on bot restart
-async def auto_broadcast(context: CallbackContext) -> None:
-    user_chat_ids = get_all_users()
-    message_text = "🔄 **机器人已重新启动！请查看最新信息！**"
+# /edit command - Updates a previously sent message
+async def edit_message(update: Update, context: CallbackContext) -> None:
+    user_chat_ids = load_user_chat_ids()
+    if not user_chat_ids:
+        await update.message.reply_text("❌ 没有注册用户，无法编辑公告。")
+        return
 
+    message_text = update.message.text.split("\n")
+    if message_text[0].startswith("/edit"):
+        message_text.pop(0)
+
+    if len(message_text) < 2:
+        await update.message.reply_text("⚠️ 请输入公告内容格式:\n\n"
+                                        "<b>标题 (加粗)</b>\n"
+                                        "修改后的内容\n"
+                                        "(可选) 新的图片URL 或 图片文件名\n"
+                                        "(可选) 按钮格式: `按钮文本|链接`",
+                                        parse_mode="HTML")
+        return
+
+    title = f"{message_text[0]}\n\n" if message_text[0] else ""
+    body_text = "\n".join(message_text[1:])
+    new_message = title + body_text
+
+    success_count, failure_count = 0, 0
     for chat_id in user_chat_ids:
         try:
-            await context.bot.send_message(chat_id=chat_id, text=message_text, parse_mode="Markdown")
+            message_id = get_message_id(chat_id)
+            if message_id:
+                await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=new_message, parse_mode="HTML")
+                success_count += 1
+            else:
+                failure_count += 1
         except Exception as e:
-            logger.error(f"❌ 发送失败: {chat_id}: {e}")
+            logger.error(f"❌ 更新失败给 {chat_id}: {e}")
+            failure_count += 1
 
-# ✅ Main Function with JobQueue
+    await update.message.reply_text(f"✅ 公告已更新！成功: {success_count}，失败: {failure_count}")
+
+
+# Main function
 def main():
-    token = os.getenv("TELEGRAM_BOT_TOKEN")  # 🔹 Use .env variable for security
+    token = os.getenv("7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs")  # Use environment variable for security
 
     application = Application.builder().token(token).build()
-
-    # ✅ Initialize MySQL Table
-    init_db()
-
-    # ✅ Initialize JobQueue properly
-    job_queue = application.job_queue
-    job_queue.run_once(auto_broadcast, when=10)
-
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("edit", edit_message))
 
-    logger.info("Starting bot...")
+    logger.info("🚀 机器人已启动...")
     application.run_polling()
+
 
 if __name__ == "__main__":
     main()

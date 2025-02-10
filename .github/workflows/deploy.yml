@@ -1,4 +1,30 @@
-- name: Set Firebase Credentials
-  run: echo "$FIREBASE_CREDENTIALS_JSON" > firebase_credentials.json
-  env:
-    FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+name: Deploy Bot
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set Firebase Credentials
+        run: echo "$FIREBASE_CREDENTIALS_JSON" > firebase_credentials.json
+        env:
+          FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+
+      - name: Set Telegram Token
+        run: echo "$TELEGRAM_BOT_TOKEN" > .env
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Bot
+        run: python MenuKeybaord.py

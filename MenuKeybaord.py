@@ -10,47 +10,58 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load Firebase credentials from environment variable
+# Load Firebase credentials securely
 firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
 if firebase_credentials:
-    cred_dict = json.loads(firebase_credentials)
-    cred = credentials.Certificate(cred_dict)
-    firebase_admin.initialize_app(cred)
-    db = firestore.client()
+    try:
+        if os.path.exists(firebase_credentials):  # If it's a file path
+            cred = credentials.Certificate(firebase_credentials)
+        else:  # If stored as a JSON string in GitHub Secrets
+            cred_dict = json.loads(firebase_credentials)
+            cred = credentials.Certificate(cred_dict)
+
+        firebase_admin.initialize_app(cred)
+        db = firestore.client()
+    except Exception as e:
+        logger.error(f"❌ Firebase initialization failed: {e}")
+        exit(1)
 else:
     logger.error("❌ FIREBASE_CREDENTIALS environment variable not set.")
+    exit(1)
 
-# Collection name in Firestore
+# Load Telegram bot token securely
+token = os.getenv("7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs")
+if not token:
+    logger.error("❌ TELEGRAM_BOT_TOKEN environment variable not set.")
+    exit(1)
+
+# Firestore collection names
 USER_COLLECTION = "telegram_users"
 MESSAGE_COLLECTION = "sent_messages"
 
-
-# Store user chat IDs in Firestore
+# Save user chat ID in Firestore
 def save_user_chat_id(chat_id):
-    doc_ref = db.collection(USER_COLLECTION).document(str(chat_id))
-    doc_ref.set({"chat_id": chat_id})
+    db.collection(USER_COLLECTION).document(str(chat_id)).set({"chat_id": chat_id})
 
-
-# Load all user chat IDs from Firestore
+# Load all registered user chat IDs from Firestore
 def load_user_chat_ids():
     users = db.collection(USER_COLLECTION).stream()
     return [user.id for user in users]
 
-
-# Store message ID in Firestore (for editing messages later)
+# Save sent message ID for editing
 def save_message_id(chat_id, message_id):
     db.collection(MESSAGE_COLLECTION).document(str(chat_id)).set({"message_id": message_id})
 
-
-# Get stored message ID (for editing)
+# Retrieve stored message ID
 def get_message_id(chat_id):
     doc = db.collection(MESSAGE_COLLECTION).document(str(chat_id)).get()
-    return doc.to_dict().get("message_id") if doc.exists else None
+    if doc.exists and doc.to_dict():
+        return doc.to_dict().get("message_id")
+    return None
 
-
-# /start command - Registers users and displays menu buttons
+# /start command - Register users and show menu
 async def start(update: Update, context: CallbackContext) -> None:
-    chat_id = update.message.chat_id
+    chat_id = update.message.chat.id
     save_user_chat_id(chat_id)
 
     keyboard = [
@@ -63,8 +74,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 
     await update.message.reply_text("✅ 你已成功注册，可接收最新公告！\n请选择一个服务：", reply_markup=reply_markup)
 
-
-# /broadcast command - Sends messages, images, and buttons to all users
+# /broadcast command - Send messages, images, and buttons to all users
 async def broadcast(update: Update, context: CallbackContext) -> None:
     user_chat_ids = load_user_chat_ids()
     if not user_chat_ids:
@@ -73,7 +83,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
     message_text = update.message.text.split("\n")
     if message_text[0].startswith("/broadcast"):
-        message_text.pop(0)  # Remove the first line
+        message_text.pop(0)
 
     if len(message_text) < 2:
         await update.message.reply_text("⚠️ 请输入公告内容格式:\n\n"
@@ -92,7 +102,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
     for line in message_text[1:]:
         line = line.strip()
-        if line.startswith("http") and (".jpg" in line or ".png" in line):
+        if line.startswith("http") and any(ext in line for ext in [".jpg", ".png", ".jpeg"]):
             images.append(line)
         elif "|" in line:
             button_row = [InlineKeyboardButton(*btn.strip().split("|", 1)) for btn in line.split(",")]
@@ -120,8 +130,7 @@ async def broadcast(update: Update, context: CallbackContext) -> None:
 
     await update.message.reply_text(f"✅ 公告已发送！成功: {success_count}，失败: {failure_count}")
 
-
-# /edit command - Updates a previously sent message
+# /edit command - Edit previous messages
 async def edit_message(update: Update, context: CallbackContext) -> None:
     user_chat_ids = load_user_chat_ids()
     if not user_chat_ids:
@@ -160,11 +169,8 @@ async def edit_message(update: Update, context: CallbackContext) -> None:
 
     await update.message.reply_text(f"✅ 公告已更新！成功: {success_count}，失败: {failure_count}")
 
-
-# Main function
+# Main function to run the bot
 def main():
-    token = os.getenv("7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs")  # Use environment variable for security
-
     application = Application.builder().token(token).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("broadcast", broadcast))
@@ -172,7 +178,6 @@ def main():
 
     logger.info("🚀 机器人已启动...")
     application.run_polling()
-
 
 if __name__ == "__main__":
     main()

@@ -3,3 +3,4 @@ flask
 python-telegram-bot[job-queue]
 mysql-connector-python
 python-dotenv
+firebase-admin

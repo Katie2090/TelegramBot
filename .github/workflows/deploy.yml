@@ -18,6 +18,7 @@ jobs:
         env:
           FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
 
+
       - name: Set Telegram Token
         run: echo "$TELEGRAM_BOT_TOKEN" > .env
         env:

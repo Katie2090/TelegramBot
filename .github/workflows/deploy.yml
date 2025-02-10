@@ -26,6 +26,11 @@ jobs:
       env:
         FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
 
+    - name: Set Firebase Credentials
+      run: echo "$FIREBASE_CREDENTIALS_JSON" > firebase_credentials.json
+      env:
+        FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+
     - name: Run the Bot
       env:
         FIREBASE_CREDENTIALS: firebase_credentials.json

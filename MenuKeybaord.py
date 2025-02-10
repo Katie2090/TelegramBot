@@ -11,14 +11,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load Firebase credentials securely
-firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
+firebase_credentials = os.getenv("FIREBASE_CREDENTIALS_JSON")  # Match GitHub secret name
 if firebase_credentials:
     try:
-        if os.path.exists(firebase_credentials):  # If it's a file path
-            cred = credentials.Certificate(firebase_credentials)
-        else:  # If stored as a JSON string in GitHub Secrets
+        if firebase_credentials.startswith("{"):  # Detect JSON string
             cred_dict = json.loads(firebase_credentials)
             cred = credentials.Certificate(cred_dict)
+        elif os.path.exists(firebase_credentials):  # If it's a file path
+            cred = credentials.Certificate(firebase_credentials)
+        else:
+            raise ValueError("Invalid Firebase Credentials")
 
         firebase_admin.initialize_app(cred)
         db = firestore.client()
@@ -26,11 +28,11 @@ if firebase_credentials:
         logger.error(f"❌ Firebase initialization failed: {e}")
         exit(1)
 else:
-    logger.error("❌ FIREBASE_CREDENTIALS environment variable not set.")
+    logger.error("❌ FIREBASE_CREDENTIALS_JSON environment variable not set.")
     exit(1)
 
 # Load Telegram bot token securely
-token = os.getenv("7100869336:AAH1khQ33dYv4YElbdm8EmYfARMNkewHlKs")
+token = os.getenv("TELEGRAM_BOT_TOKEN")
 if not token:
     logger.error("❌ TELEGRAM_BOT_TOKEN environment variable not set.")
     exit(1)
@@ -74,107 +76,10 @@ async def start(update: Update, context: CallbackContext) -> None:
 
     await update.message.reply_text("✅ 你已成功注册，可接收最新公告！\n请选择一个服务：", reply_markup=reply_markup)
 
-# /broadcast command - Send messages, images, and buttons to all users
-async def broadcast(update: Update, context: CallbackContext) -> None:
-    user_chat_ids = load_user_chat_ids()
-    if not user_chat_ids:
-        await update.message.reply_text("❌ 没有注册用户，无法发送公告。")
-        return
-
-    message_text = update.message.text.split("\n")
-    if message_text[0].startswith("/broadcast"):
-        message_text.pop(0)
-
-    if len(message_text) < 2:
-        await update.message.reply_text("⚠️ 请输入公告内容格式:\n\n"
-                                        "<b>标题 (加粗)</b>\n"
-                                        "主要内容\n"
-                                        "(可选) 图片URL 或 图片文件名\n"
-                                        "(可选) 按钮格式: `按钮文本|链接`",
-                                        parse_mode="HTML")
-        return
-
-    # Extract title, body text, images, and buttons
-    title = f"{message_text[0]}\n\n" if message_text[0] else ""
-    body_text = []
-    images = []
-    buttons = []
-
-    for line in message_text[1:]:
-        line = line.strip()
-        if line.startswith("http") and any(ext in line for ext in [".jpg", ".png", ".jpeg"]):
-            images.append(line)
-        elif "|" in line:
-            button_row = [InlineKeyboardButton(*btn.strip().split("|", 1)) for btn in line.split(",")]
-            buttons.append(button_row)
-        else:
-            body_text.append(line)
-
-    message_content = title + "\n".join(body_text)
-    inline_markup = InlineKeyboardMarkup(buttons) if buttons else None
-
-    success_count, failure_count = 0, 0
-    for chat_id in user_chat_ids:
-        try:
-            if images:
-                sent_media = await context.bot.send_photo(chat_id=chat_id, photo=images[0], caption=message_content, reply_markup=inline_markup, parse_mode="HTML")
-                save_message_id(chat_id, sent_media.message_id)
-            else:
-                sent_message = await context.bot.send_message(chat_id=chat_id, text=message_content, reply_markup=inline_markup, parse_mode="HTML")
-                save_message_id(chat_id, sent_message.message_id)
-
-            success_count += 1
-        except Exception as e:
-            logger.error(f"❌ 发送失败给 {chat_id}: {e}")
-            failure_count += 1
-
-    await update.message.reply_text(f"✅ 公告已发送！成功: {success_count}，失败: {failure_count}")
-
-# /edit command - Edit previous messages
-async def edit_message(update: Update, context: CallbackContext) -> None:
-    user_chat_ids = load_user_chat_ids()
-    if not user_chat_ids:
-        await update.message.reply_text("❌ 没有注册用户，无法编辑公告。")
-        return
-
-    message_text = update.message.text.split("\n")
-    if message_text[0].startswith("/edit"):
-        message_text.pop(0)
-
-    if len(message_text) < 2:
-        await update.message.reply_text("⚠️ 请输入公告内容格式:\n\n"
-                                        "<b>标题 (加粗)</b>\n"
-                                        "修改后的内容\n"
-                                        "(可选) 新的图片URL 或 图片文件名\n"
-                                        "(可选) 按钮格式: `按钮文本|链接`",
-                                        parse_mode="HTML")
-        return
-
-    title = f"{message_text[0]}\n\n" if message_text[0] else ""
-    body_text = "\n".join(message_text[1:])
-    new_message = title + body_text
-
-    success_count, failure_count = 0, 0
-    for chat_id in user_chat_ids:
-        try:
-            message_id = get_message_id(chat_id)
-            if message_id:
-                await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=new_message, parse_mode="HTML")
-                success_count += 1
-            else:
-                failure_count += 1
-        except Exception as e:
-            logger.error(f"❌ 更新失败给 {chat_id}: {e}")
-            failure_count += 1
-
-    await update.message.reply_text(f"✅ 公告已更新！成功: {success_count}，失败: {failure_count}")
-
 # Main function to run the bot
 def main():
     application = Application.builder().token(token).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("broadcast", broadcast))
-    application.add_handler(CommandHandler("edit", edit_message))
 
     logger.info("🚀 机器人已启动...")
     application.run_polling()

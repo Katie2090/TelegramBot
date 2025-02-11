@@ -1,10 +1,9 @@
 import os
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
-    CallbackQueryHandler,
     MessageHandler,
     filters,
     ContextTypes,
@@ -44,13 +43,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_ids.add(user_id)
     save_user_ids(user_ids)
 
-    # Create menu buttons
+    # Create menu buttons (same as the sample image)
     menu_buttons = [
         ["外卖", "换汇", "闲置", "求职"],
         ["滴滴", "签证", "代购", "红包"],
         ["充值", "收款", "转账", "我的"],
     ]
-    reply_markup = ReplyKeyboardMarkup(menu_buttons, resize_keyboard=True)
+    reply_markup = ReplyKeyboardMarkup(menu_buttons, resize_keyboard=True, one_time_keyboard=False)
     await update.message.reply_text("欢迎使用亚太·亚通机器人！请选择一个选项：", reply_markup=reply_markup)
 
 # Handle menu button clicks
@@ -84,45 +83,14 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Command: /broadcast
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_ids = load_user_ids()
-    args = context.args
-
-    if not args:
-        await update.message.reply_text("用法: /broadcast <消息> [图片URL] [按钮文本|按钮URL]")
+    message = " ".join(context.args)
+    if not message:
+        await update.message.reply_text("用法: /broadcast <消息>")
         return
 
-    # Extract messages, photos, and buttons from args
-    messages = []
-    photos = []
-    buttons = []
-
-    # Parse arguments
-    i = 0
-    while i < len(args):
-        if args[i].startswith("http"):  # Assume it's a photo URL
-            photos.append(args[i])
-        elif "|" in args[i]:  # Assume it's a button (text|url)
-            button_text, button_url = args[i].split("|")
-            buttons.append(InlineKeyboardButton(button_text, url=button_url))
-        else:  # Assume it's a message
-            messages.append(args[i])
-        i += 1
-
-    # Create inline keyboard if buttons exist
-    reply_markup = None
-    if buttons:
-        reply_markup = InlineKeyboardMarkup([buttons])
-
-    # Send messages, photos, and buttons to all users
     for user_id in user_ids:
         try:
-            # Send messages
-            for message in messages:
-                await context.bot.send_message(chat_id=user_id, text=message, reply_markup=reply_markup)
-
-            # Send photos
-            if photos:
-                media_group = [InputMediaPhoto(photo) for photo in photos]
-                await context.bot.send_media_group(chat_id=user_id, media=media_group)
+            await context.bot.send_message(chat_id=user_id, text=message)
         except Exception as e:
             logger.error(f"Failed to send message to {user_id}: {e}")
 

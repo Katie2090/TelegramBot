@@ -43,7 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_ids.add(user_id)
     save_user_ids(user_ids)
 
-    # Create menu buttons (same as the sample image)
+    # Create menu buttons (4 buttons per row, as in the sample image)
     menu_buttons = [
         ["外卖", "换汇", "闲置", "求职"],
         ["滴滴", "签证", "代购", "红包"],
